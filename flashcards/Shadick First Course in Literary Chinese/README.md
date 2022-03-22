@@ -13,4 +13,6 @@ If you want the flashcards to test you on the German definitions (and avoid them
 pdftotxt -raw shadick.pdf
 pip3 install unidecode
 ./extract.py
+# diff shadick-flashcards{,-corrected}.txt > flashcard-corrections.diff
+patch shadick-flashcards.txt < flashcard-corrections.diff
 ```
