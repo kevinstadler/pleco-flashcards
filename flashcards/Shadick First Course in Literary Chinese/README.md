@@ -10,9 +10,11 @@ If you want the flashcards to test you on the German definitions (and avoid them
 ```
 
 ```
-pdftotxt -raw shadick.pdf
+pdftotext -raw shadick.pdf
+
+# diff shadick.txt{.orig,} > shadick-corrections.diff
+patch shadick.txt < shadick-corrections.diff
+
 pip3 install unidecode
 ./extract.py
-# diff shadick-flashcards{,-corrected}.txt > flashcard-corrections.diff
-patch shadick-flashcards.txt < flashcard-corrections.diff
 ```
