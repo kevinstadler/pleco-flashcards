@@ -27,7 +27,7 @@ import unidecode
 # 3rd tone should use *breve*, not caron!
 tonechars = "āáǎàēéěèīíǐìōóǒòūúǔù@@ǚǜ"
 
-wadegiles = r"[A-Za-zü\'’1-5\.\-ìǔ]+[h1-5]"
+wadegiles = r"[A-Za-zü\'’1-5\.\-ǔ]+(?:ìh|[1-5])"
 # pinyin = r'[!\w]*[a-z' + tonechars + '\.]+' # disallow upper case endings
 pinyinendings = tonechars + 'aeiougnr'
 pinyin = f'\S*[{pinyinendings}\.…]' # disallow upper case endings or ending in …
@@ -53,8 +53,10 @@ def processcategory(categoryheader, t):
 
     # remove hyphenated line breaks (especially bad for WG)
     t = t.replace('-\n', '')
+    # t = re.sub(f'-\n(?![^{hanzi}])', r'\1', t)
     t = t.replace(',\n', ', ')
     t = t.replace('\n...\n', '...')
+    t = t.replace(' / ', '/')
     # merge hanzi. with above line
     t = re.sub(f'\n([{hanzi}]\.\n)', r' \1', t)
     t = re.sub(f'([{hanzi}])=([{hanzi}])', r'\1/\2', t)
@@ -62,8 +64,15 @@ def processcategory(categoryheader, t):
     # t = re.sub(f'\.\.\.\n(?![{hanzi}])', '...', t)
     # merge single non-Hanzi character lines with above
     t = re.sub('\n([a-z,]\n)', r'\1', t)
-    # TODO merge split pinyin lines (not working)
-    t = re.sub(f'^({tonepinyin})\n({tonepinyin})$', r'\1\2', t, flags=re.MULTILINE)
+
+    # remove single spaces from adjacent pinyins (identified by either a tone coda, or toneless zi and zhi)
+    t = re.sub('(?<=\s)( *\w*(' + tonecoda + '|zh?i))+', removespaces, t)
+    # merge split pinyin lines
+    t = re.sub(f'({tonepinyin}(?:zh?i)?)\n({tonepinyin})$', r'\1\2', t, flags=re.MULTILINE)
+    # remove single spaces from adjacent wade giles
+    t = re.sub(f'({wadegiles}) ({wadegiles}\s)', r'\1\2', t)
+    # merge split wade-giles lines
+    t = re.sub(f'^({wadegiles}) ?\n({wadegiles})$', r'\1\2', t, flags=re.MULTILINE)
 
     # ^(num)\nhanzi to (num)hanzi
     t = re.sub(f'^(\(\d+\))\n([{hanzi}])', r'\1\2', t, flags=re.MULTILINE)
@@ -72,10 +81,6 @@ def processcategory(categoryheader, t):
     # [hanzi-line with at least one space]\nhanzi to nowt
     t = re.sub(f'^([hanzi]+ [{hanzi}\. ]+)\n([{hanzi}])', r'\1\2', t, flags=re.MULTILINE)
     # TODO remove newline before every hanzi if the hanzi (sequence) isn't followed by wade-giles or pinyin
-
-    # remove single spaces from personal name pinyins
-    t = re.sub('(?<=\s)( *\w*' + tonecoda + ')+', removespaces, t)
-    # t = re.sub('([A-Z]' + pinyin + '(?: \w*' + tonecoda + ')+)', removespaces, t)
 
     # traditional and simplified
     t = re.sub(f'^\(?(\d*)\)? ?([{hanzi}][\S]*) ([{hanzi}][\w\.…]*)\n? *{wadegiles}\s+({pinyin}) ?!?\s+', r'\1\3[\2]\t\4\t', t, flags=re.MULTILINE)
@@ -92,6 +97,9 @@ def processcategory(categoryheader, t):
     # merge definitions onto previous line (remove preceding newline + space(s)
     t = re.sub(f'\n(?!/|[{hanzi}\/\.…\[\]]+\t)', r' ', t, flags=re.MULTILINE)
 
+    # slashes to parens
+    t = re.sub(r'^(\w+)/(\w+)(?=\t)', r'\1(\2)', t, flags=re.MULTILINE)
+
     # TODO https://www.plecoforums.com/threads/multiple-new-lines-in-user-defined-flashcards.5916/#post-44863
     # \ueab2 \ueab3 for bold, 4 and 5 for italic
     repls = ['I', 'II', 'III', 'IV', 'V', 'VI']
@@ -99,7 +107,7 @@ def processcategory(categoryheader, t):
       t = re.sub(f'(?<=[ \t]){repl}\. ?', ('' if i == 0 else '\ueab1') + f'\ueab2{i+1}\ueab3 ', t)
 
     # make POS cursive
-    t = re.sub('(?<=[ \t])([a-z]+\.? Konj\.|Ad[jv]\.?|N|Pron\.?|[CHIPST]V|Zahlwort) ', '\ueab4\\1\ueab5 ', t, flags=re.IGNORECASE)
+    t = re.sub('(?<=[ \t])([a-z]+\.? Konj\.?|Ad[jv]\.?|N|Pron\.?|[CHIPST]V|Zahlwort) ', '\ueab4\\1\ueab5 ', t, flags=re.IGNORECASE)
     t = re.sub('\*([a-z]+\.? Konj\.?|Ad[jv]\.?|N|Pron\.?|[CHIPST]V|Zahlwort) ', ' \ueab4\\1\ueab5 ', t, flags=re.IGNORECASE)
 
     return '\n'.join([categoryheader, t])
